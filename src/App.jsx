@@ -1,20 +1,23 @@
 import { useEffect } from 'react';
 import useStore from './engine/gameState';
-import { startSimulation, stopSimulation } from './engine/timeEngine';
-import './App.css';
+import { startSimulation, stopSimulation } from './engine/simulationEngine';
 
-function App() {
-  // Pull data from the Zustand store
-  const { 
-    time, batteryLevel, isBlackout, activeEvent, 
-    settings, togglePause, upgradeInfrastructure, loadGame 
-  } = useStore();
+// Import all your new UI Components
+import MasterVisualizer from './components/MasterVisualizer';
+import Dashboard from './components/Dashboard';
+import SystemLog from './components/SystemLog';
+import GridChart from './components/GridChart';
+import ControlPanel from './components/ControlPanel';
+
+export default function App() {
+  // Pull the loadGame function from your store
+  const loadGame = useStore((state) => state.loadGame);
 
   useEffect(() => {
-    // 1. Load saved state from localStorage on startup
+    // 1. Load any saved state from localStorage on startup
     loadGame();
     
-    // 2. Start the animation loop
+    // 2. Start the physics and failure loop
     startSimulation();
     
     // 3. Cleanup on shutdown
@@ -22,44 +25,50 @@ function App() {
   }, [loadGame]);
 
   return (
-    <div style={{ padding: '40px', fontFamily: 'sans-serif', maxWidth: '600px', margin: 'auto' }}>
-      <h1>Energy Grid Simulation</h1>
+    <div style={{ 
+      background: '#0f0f11', 
+      minHeight: '100vh', 
+      padding: '40px', 
+      color: '#ffffff', 
+      fontFamily: 'sans-serif' 
+    }}>
       
-      {/* Status Panel */}
-      <div style={{ 
-        padding: '20px', 
-        backgroundColor: isBlackout ? '#ffcccc' : '#f0f9ff',
-        borderRadius: '12px',
-        border: '1px solid #ddd'
-      }}>
-        <h2 style={{ color: isBlackout ? 'red' : 'green' }}>
-          {isBlackout ? '⚠️ BLACKOUT' : '✅ Power Stable'}
-        </h2>
-        <p>Simulation Time: {time.toFixed(2)}:00</p>
-        <p>Battery Level: <strong>{batteryLevel.toFixed(1)}%</strong></p>
-      </div>
+      <div style={{ maxWidth: '1000px', margin: 'auto' }}>
+        
+        {/* Header */}
+        <h1 style={{ 
+          borderBottom: '2px solid #333', 
+          paddingBottom: '10px', 
+          marginBottom: '30px',
+          color: '#00ccff',
+          letterSpacing: '2px'
+        }}>
+          GLOBAL GRID COMMAND SYSTEM
+        </h1>
+        
+        {/* Main Grid Layout */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: '1fr 1fr', 
+          gap: '30px' 
+        }}>
+          
+          {/* Left Column: Real-time Status & Logs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <MasterVisualizer />
+            <Dashboard />
+            <SystemLog />
+          </div>
 
-      {/* Events */}
-      {activeEvent && (
-        <div style={{ color: 'red', fontWeight: 'bold', margin: '15px 0' }}>
-          🚨 EMERGENCY: {activeEvent.name} active!
+          {/* Right Column: Analytics & Controls */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <GridChart />
+            <ControlPanel />
+          </div>
+          
         </div>
-      )}
 
-      {/* Control Panel */}
-      <div style={{ marginTop: '30px', display: 'flex', gap: '10px' }}>
-        <button onClick={togglePause}>
-          {settings.isPaused ? 'Resume' : 'Pause'}
-        </button>
-        <button onClick={() => upgradeInfrastructure('solarCapacity')}>
-          Upgrade Solar (+20%)
-        </button>
-        <button onClick={() => useStore.getState().saveGame()}>
-          Save Progress
-        </button>
       </div>
     </div>
   );
 }
-
-export default App;
