@@ -9,7 +9,7 @@ const initialTransformers = [
   ...Array.from({length: 3}, (_, i) => ({ id: `DT-R${i+1}`, sector: 'Sector 5: Residential Grid', role: 'Residential', cap: 80, load: 0, temp: 30, status: 'ONLINE', voltage: '240V', cooling: 100, eff: 1 }))
 ];
 
-const useStore = create((set) => ({
+const useStore = create((set, get) => ({
   time: 0, 
   batteryLevel: 50, 
   demand: 500, 
@@ -20,11 +20,48 @@ const useStore = create((set) => ({
   transformers: initialTransformers,
   settings: { isPaused: false },
 
-  // Unified action to update simulation data
+  // --- ACTIONS ---
+
+  addLog: (message) => set((state) => ({ 
+    logs: [`[${new Date().toLocaleTimeString()}] ${message}`, ...state.logs].slice(0, 50) 
+  })),
+
+  manualOverride: (id, key, value) => set((state) => ({
+    transformers: state.transformers.map(t => 
+      t.id === id ? { ...t, [key]: parseFloat(value) } : t
+    )
+  })),
+
+  repairSingleNode: (id) => set((state) => ({
+    transformers: state.transformers.map(t => 
+      t.id === id ? { ...t, status: 'ONLINE', temp: 35, load: 0, eff: 1 } : t
+    )
+  })),
+
+  stressTestGrid: () => set((state) => {
+    const stressed = state.transformers.map(t => ({ ...t, load: t.cap * 1.5 }));
+    get().addLog("CRITICAL ALERT: Stress Test Initiated. Grid at 150% Load.");
+    return { transformers: stressed };
+  }),
+
+  exportGridReport: () => {
+    const state = get();
+    const report = JSON.stringify(state.transformers, null, 2);
+    const blob = new Blob([report], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `grid-report-${new Date().toISOString()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
   updateGrid: (newData) => set((state) => ({ ...state, ...newData })),
   
-  // UI Actions
-  togglePause: () => set((state) => ({ settings: { ...state.settings, isPaused: !state.settings.isPaused } })),
+  togglePause: () => set((state) => ({ 
+    settings: { ...state.settings, isPaused: !state.settings.isPaused } 
+  })),
+
   repairGrid: () => set((state) => ({
     isBlackout: false,
     transformers: state.transformers.map(t => ({ ...t, status: 'ONLINE', temp: 35, load: 0, eff: 1 }))
