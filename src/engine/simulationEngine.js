@@ -12,7 +12,6 @@ export const startSimulation = () => {
     lastTimestamp = timestamp;
 
     const state = useStore.getState();
-    console.log("Engine Sending Update:", { time: state.time, battery: state.batteryLevel });
 
     // Only run if the system is powered and not paused
     if (!state.settings.isPaused && !state.isBlackout) {
@@ -69,7 +68,8 @@ export const startSimulation = () => {
       let nextBattery = Math.min(100, Math.max(0, state.batteryLevel + (netPower / 60) * timeStep));
       const newScore = (state.score || 0) + (onlineNodes * deltaTime);
 
-      if (Math.random() < 0.0002) {
+      // [FIX 1]: Random weather event only fires if the Live API (or Manual Mode) hasn't taken over
+      if (Math.random() < 0.0002 && !state.isManualWeather) {
         const weathers = ['CLEAR', 'STORM', 'HEATWAVE'];
         state.triggerWeatherEvent(weathers[Math.floor(Math.random() * weathers.length)]);
       }
@@ -85,9 +85,14 @@ export const startSimulation = () => {
         transformers: updatedTransformers,
         logs: [...logsToPush.map(log => `[${nextTime.toFixed(1)}h] ${log}`), ...state.logs].slice(0, 20)
       });
+
+      // [FIX 2]: Ensure the Machine Learning model processes the new physics data every frame
+      useStore.getState().runAIPredictions();
     }
+    
     requestRef = requestAnimationFrame(animate);
   };
+  
   requestRef = requestAnimationFrame(animate);
 };
 
