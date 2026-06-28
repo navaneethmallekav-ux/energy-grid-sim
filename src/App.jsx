@@ -29,15 +29,15 @@ export default function App() {
 
   const getNavBtnStyle = (tabName) => ({
     padding: '12px 30px',
-    background: activeTab === tabName ? '#00f3ff' : 'transparent',
+    background: activeTab === tabName ? '#00f3ff' : '#0a0a0f',
     color: activeTab === tabName ? '#000' : '#00f3ff',
     border: `1px solid #00f3ff`,
     borderRadius: '4px',
     cursor: 'pointer',
-    fontWeight: '900',
+    fontWeight: 'bold', // Lowered from 900 to normal bold to reduce strain
     letterSpacing: '2px',
-    transition: 'all 0.3s ease',
-    textTransform: 'uppercase'
+    transition: 'all 0.2s ease',
+    boxShadow: activeTab === tabName ? '0 0 15px rgba(0, 243, 255, 0.4)' : 'none'
   });
 
   return (
