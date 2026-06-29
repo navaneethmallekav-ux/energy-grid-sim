@@ -1,25 +1,21 @@
 {
-  "gridName": "Omega Regional Grid",
-  "baseDemand": 900,
+  "gridName": "OMEGA SECTOR PRIME",
+  "baseDemand": 800,
   "nodes": [
-    { "id": "GEN-A1", "sector": "Sector 1: Generation Core", "type": "generator", "capacity": 300, "voltage": "345kV", "connections": ["SUB-1"] },
-    { "id": "GEN-A2", "sector": "Sector 1: Generation Core", "type": "generator", "capacity": 300, "voltage": "345kV", "connections": ["SUB-1"] },
-    { "id": "GEN-A3", "sector": "Sector 1: Generation Core", "type": "generator", "capacity": 300, "voltage": "345kV", "connections": ["SUB-2"] },
-    
-    { "id": "SUB-1", "sector": "Sector 2: Heavy Transmission", "type": "substation", "capacity": 500, "voltage": "500kV", "connections": ["IND-1", "IND-2"] },
-    { "id": "SUB-2", "sector": "Sector 2: Heavy Transmission", "type": "substation", "capacity": 500, "voltage": "500kV", "connections": ["IND-3", "COM-1"] },
-    { "id": "SUB-3", "sector": "Sector 2: Heavy Transmission", "type": "substation", "capacity": 500, "voltage": "500kV", "connections": ["COM-2", "RES-1"] },
-    
-    { "id": "IND-1", "sector": "Sector 3: Industrial District", "type": "consumer", "capacity": 300, "voltage": "13.8kV", "connections": [] },
-    { "id": "IND-2", "sector": "Sector 3: Industrial District", "type": "consumer", "capacity": 300, "voltage": "13.8kV", "connections": [] },
-    { "id": "IND-3", "sector": "Sector 3: Industrial District", "type": "consumer", "capacity": 300, "voltage": "13.8kV", "connections": [] },
-    
-    { "id": "COM-1", "sector": "Sector 4: Commercial Hub", "type": "consumer", "capacity": 200, "voltage": "4.16kV", "connections": [] },
-    { "id": "COM-2", "sector": "Sector 4: Commercial Hub", "type": "consumer", "capacity": 200, "voltage": "4.16kV", "connections": [] },
-    { "id": "COM-3", "sector": "Sector 4: Commercial Hub", "type": "consumer", "capacity": 200, "voltage": "4.16kV", "connections": [] },
-    
-    { "id": "RES-1", "sector": "Sector 5: Residential Grid", "type": "consumer", "capacity": 100, "voltage": "240V", "connections": [] },
-    { "id": "RES-2", "sector": "Sector 5: Residential Grid", "type": "consumer", "capacity": 100, "voltage": "240V", "connections": [] },
-    { "id": "RES-3", "sector": "Sector 5: Residential Grid", "type": "consumer", "capacity": 100, "voltage": "240V", "connections": [] }
+    { "id": "TX-G1", "type": "generator", "capacity": 500, "voltage": "345kV", "sector": "Sector 1", "lat": 47.6062, "lng": -122.3321 },
+    { "id": "TX-G2", "type": "generator", "capacity": 500, "voltage": "345kV", "sector": "Sector 1", "lat": 47.6150, "lng": -122.3400 },
+    { "id": "TX-G3", "type": "generator", "capacity": 500, "voltage": "345kV", "sector": "Sector 1", "lat": 47.6200, "lng": -122.3350 },
+    { "id": "TX-G4", "type": "generator", "capacity": 500, "voltage": "345kV", "sector": "Sector 1", "lat": 47.5950, "lng": -122.3200 },
+    { "id": "TX-G5", "type": "generator", "capacity": 500, "voltage": "345kV", "sector": "Sector 1", "lat": 47.6000, "lng": -122.3150 },
+    { "id": "TX-T1", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 2", "lat": 47.6100, "lng": -122.3250 },
+    { "id": "TX-T2", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 2", "lat": 47.6250, "lng": -122.3100 },
+    { "id": "TX-T3", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 2", "lat": 47.6300, "lng": -122.3200 },
+    { "id": "TX-T4", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 2", "lat": 47.5900, "lng": -122.3350 },
+    { "id": "TX-T5", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 2", "lat": 47.5850, "lng": -122.3450 },
+    { "id": "TX-T6", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 3", "lat": 47.6400, "lng": -122.3000 },
+    { "id": "TX-T7", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 3", "lat": 47.6450, "lng": -122.3150 },
+    { "id": "TX-T8", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 3", "lat": 47.5750, "lng": -122.3250 },
+    { "id": "TX-T9", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 3", "lat": 47.5700, "lng": -122.3100 },
+    { "id": "TX-T10", "type": "substation", "capacity": 250, "voltage": "115kV", "sector": "Sector 3", "lat": 47.5800, "lng": -122.3000 }
   ]
 }
