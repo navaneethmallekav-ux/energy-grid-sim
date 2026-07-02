@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, Tooltip, ZoomControl, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import useStore from '../engine/gameState';
-// omegaConfig IMPORT REMOVED - We only want dynamic data!
 import { fetchCoordinates, generateRegionalGrid } from '../engine/geoUtils'; 
-// Ensure this object is defined clearly ABOVE your component
+
 const MAP_STYLES = {
   TACTICAL_DARK: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   MIDNIGHT: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
@@ -14,7 +13,6 @@ const MAP_STYLES = {
   TOPOGRAPHIC: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
 };
 
-// Resizer to defeat Leaflet "Hidden Tab" bug
 function MapResizer() {
   const map = useMap();
 
@@ -38,7 +36,6 @@ function MapResizer() {
   return null;
 }
 
-// FIXED: Break apart the center array dependencies so it doesn't infinitely loop and freeze the map
 function MapFlyTo({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -52,9 +49,8 @@ function MapFlyTo({ center }) {
 export default function GeoNodeMap() {
 
   const transformers = useStore(state => state.transformers);
-  useEffect(() => {
-    console.log("DEBUG: Transformers updated:", transformers);
-  }, [transformers]);
+  // NEW: Pull the auto-routed links from our state engine
+  const links = useStore(state => state.links); 
   
   const sendCommand = useStore(state => state.sendCommand);
   const isBlackout = useStore(state => state.isBlackout);
@@ -62,29 +58,26 @@ export default function GeoNodeMap() {
   const storeMapCenter = useStore(state => state.mapCenter);
   
   const [selectedNode, setSelectedNode] = useState(null);
-  const [activeMapStyle, setActiveMapStyle] = useState('DARK');
+  const [activeMapStyle, setActiveMapStyle] = useState('TACTICAL_DARK');
   const [geoData, setGeoData] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
-  // Parse strictly dynamically injected coordinates (No more Seattle fallback)
   useEffect(() => {
     if (transformers.length > 0) {
       const coords = {};
       transformers.forEach((t) => {
-        // ONLY use coordinates that exist on the dynamically injected node
         if (t.lat !== undefined && t.lng !== undefined) {
           coords[t.id] = [t.lat, t.lng];
         }
       });
       setGeoData(coords);
     } else {
-      setGeoData({}); // Ensure it clears out if transformers are empty
+      setGeoData({}); 
     }
   }, [transformers]);
 
-  // GLOBAL COMMAND SEARCH LOGIC
- const handleGlobalSearch = async (e) => {
+  const handleGlobalSearch = async (e) => {
     e?.preventDefault();
     if (!searchQuery.trim()) return;
 
@@ -92,23 +85,13 @@ export default function GeoNodeMap() {
     const coords = await fetchCoordinates(searchQuery);
     
     if (coords) {
-      // ROBUST NAME EXTRACTION:
-      // Try specific fields first, fallback to the first part of the display name, 
-      // then a hard fallback to the raw search query.
       const cityName = coords.city || 
                        coords.town || 
                        coords.village || 
                        (coords.displayName ? coords.displayName.split(',')[0] : searchQuery);
       
-      console.log("DEBUG: Resolved City Name:", cityName); // Check your console for this!
-      
-      // 1. Smoothly fly map to new area
       useStore.getState().setMapCenter([coords.lat, coords.lng]);
-      
-      // 2. Generate a cluster of nodes around the city
       const { newNodes, newLinks } = await generateRegionalGrid(coords.lat, coords.lng, cityName, 24);
-      
-      // 3. Inject them into the grid
       useStore.getState().addDynamicNodes(newNodes, newLinks, cityName); 
       useStore.getState().addLog(`DISCOVERED GRID: ${cityName.toUpperCase()}`, 'SUCCESS');
       
@@ -178,47 +161,42 @@ export default function GeoNodeMap() {
     });
   };
 
+  // REWRITTEN: Now properly maps the 'links' array from our state engine
   const renderPolylines = useMemo(() => {
-    const lines = [];
-    const drawnPairs = new Set();
-    
-    transformers.forEach(sourceNode => {
-      const sourceCoord = geoData[sourceNode.id];
-      // STRICT TYPE CHECK: Must be actual numbers, preventing the NaN/Undefined glitch
-      if (!sourceCoord || typeof sourceCoord[0] !== 'number' || typeof sourceCoord[1] !== 'number') return;
-      
-      const targetNodes = transformers.filter(t => t.role !== sourceNode.role);
-      targetNodes.slice(0, 2).forEach(targetNode => {
-        const targetCoord = geoData[targetNode.id];
-        
-        // STRICT TYPE CHECK: Must be actual numbers
-        if (!targetCoord || typeof targetCoord[0] !== 'number' || typeof targetCoord[1] !== 'number') return;
-        
-        const pairKey = [sourceNode.id, targetNode.id].sort().join('-');
-        if (drawnPairs.has(pairKey)) return;
-        drawnPairs.add(pairKey);
-        
-        const isActive = sourceNode.status === 'ONLINE' && targetNode.status === 'ONLINE';
-        const color = isActive ? '#00f3ff' : '#ff1a1a';
-        const opacity = isActive ? 0.6 : 0.25;
-        const dashArray = isActive ? null : '5, 15';
-        const weight = isActive ? 3 : 2;
+    if (!links || links.length === 0) return null;
 
-        lines.push(
-          <Polyline
-            key={pairKey}
-            positions={[sourceCoord, targetCoord]}
-            color={color}
-            weight={weight}
-            opacity={opacity}
-            dashArray={dashArray}
-            className={`transmission-line ${isActive ? 'active-line' : 'fault-line'}`}
-          />
-        );
-      });
+    return links.map((link, index) => {
+      const sourceNode = transformers.find(t => t.id === link.source);
+      const targetNode = transformers.find(t => t.id === link.target);
+
+      if (!sourceNode || !targetNode) return null;
+
+      const sourceCoord = geoData[link.source];
+      const targetCoord = geoData[link.target];
+
+      // STRICT TYPE CHECK: Prevents leaflet crash
+      if (!sourceCoord || typeof sourceCoord[0] !== 'number' || typeof sourceCoord[1] !== 'number') return null;
+      if (!targetCoord || typeof targetCoord[0] !== 'number' || typeof targetCoord[1] !== 'number') return null;
+
+      const isActive = sourceNode.status === 'ONLINE' && targetNode.status === 'ONLINE';
+      const color = isActive ? '#00f3ff' : '#ff1a1a';
+      const opacity = isActive ? 0.6 : 0.25;
+      const dashArray = isActive ? null : '5, 15';
+      const weight = isActive ? 3 : 2;
+
+      return (
+        <Polyline
+          key={`cable-${index}`}
+          positions={[sourceCoord, targetCoord]}
+          color={color}
+          weight={weight}
+          opacity={opacity}
+          dashArray={dashArray}
+          className={`transmission-line ${isActive ? 'active-line' : 'fault-line'}`}
+        />
+      );
     });
-    return lines;
-  }, [transformers, geoData]);
+  }, [links, transformers, geoData]);
 
   const activeNodeData = transformers.find(t => t.id === selectedNode);
 
@@ -247,48 +225,48 @@ export default function GeoNodeMap() {
         </div>
 
         <div className="hud-panel map-controls">
-  <div className="hud-title">MAP LAYER</div>
-  
-  <button 
-    type="button" 
-    className={activeMapStyle === 'TACTICAL_DARK' ? 'active' : ''} 
-    onClick={() => setActiveMapStyle('TACTICAL_DARK')}
-  >
-    TACTICAL DARK
-  </button>
+          <div className="hud-title">MAP LAYER</div>
+          
+          <button 
+            type="button" 
+            className={activeMapStyle === 'TACTICAL_DARK' ? 'active' : ''} 
+            onClick={() => setActiveMapStyle('TACTICAL_DARK')}
+          >
+            TACTICAL DARK
+          </button>
 
-  <button 
-    type="button" 
-    className={activeMapStyle === 'MIDNIGHT' ? 'active' : ''} 
-    onClick={() => setActiveMapStyle('MIDNIGHT')}
-  >
-    MIDNIGHT OPS
-  </button>
+          <button 
+            type="button" 
+            className={activeMapStyle === 'MIDNIGHT' ? 'active' : ''} 
+            onClick={() => setActiveMapStyle('MIDNIGHT')}
+          >
+            MIDNIGHT OPS
+          </button>
 
-  <button 
-    type="button" 
-    className={activeMapStyle === 'BLUEPRINT' ? 'active' : ''} 
-    onClick={() => setActiveMapStyle('BLUEPRINT')}
-  >
-    TECH BLUEPRINT
-  </button>
+          <button 
+            type="button" 
+            className={activeMapStyle === 'BLUEPRINT' ? 'active' : ''} 
+            onClick={() => setActiveMapStyle('BLUEPRINT')}
+          >
+            TECH BLUEPRINT
+          </button>
 
-  <button 
-    type="button" 
-    className={activeMapStyle === 'SATELLITE' ? 'active' : ''} 
-    onClick={() => setActiveMapStyle('SATELLITE')}
-  >
-    ORBITAL SATELLITE
-  </button>
+          <button 
+            type="button" 
+            className={activeMapStyle === 'SATELLITE' ? 'active' : ''} 
+            onClick={() => setActiveMapStyle('SATELLITE')}
+          >
+            ORBITAL SATELLITE
+          </button>
 
-  <button 
-    type="button" 
-    className={activeMapStyle === 'TOPOGRAPHIC' ? 'active' : ''} 
-    onClick={() => setActiveMapStyle('TOPOGRAPHIC')}
-  >
-    TERRAIN SCAN
-  </button>
-</div>
+          <button 
+            type="button" 
+            className={activeMapStyle === 'TOPOGRAPHIC' ? 'active' : ''} 
+            onClick={() => setActiveMapStyle('TOPOGRAPHIC')}
+          >
+            TERRAIN SCAN
+          </button>
+        </div>
         
         <div className="hud-panel grid-stats">
           <div className="hud-title">REGIONAL TELEMETRY</div>
@@ -323,15 +301,14 @@ export default function GeoNodeMap() {
           <MapFlyTo center={storeMapCenter} />
           
           <TileLayer
-  url={MAP_STYLES[activeMapStyle] || MAP_STYLES.TACTICAL_DARK}
-  attribution='&copy; OpenStreetMap contributors, CartoDB, Esri'
-/>
+            url={MAP_STYLES[activeMapStyle] || MAP_STYLES.TACTICAL_DARK}
+            attribution='&copy; OpenStreetMap contributors, CartoDB, Esri'
+          />
           
           {renderPolylines}
 
           {useMemo(() => {
             return transformers.map(node => {
-              // STRICT CHECK: Safely pull coordinates, ensuring 0 is not treated as false
               const position = (node.lat !== undefined && node.lng !== undefined) 
                 ? [node.lat, node.lng] 
                 : geoData[node.id];

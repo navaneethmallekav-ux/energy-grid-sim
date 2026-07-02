@@ -10,6 +10,7 @@ import ControlPanel from './components/ControlPanel';
 import TransformerList from './components/TransformerList';
 import GridAutopilot from './components/GridAutopilot';
 import GeoNodeMap from './components/GeoNodeMap';
+import AudioManager from './components/AudioManager'; // NEW: Imported the Audio Manager
 
 const getSocketUrl = () => {
   const hostname = window.location.hostname;
@@ -142,6 +143,8 @@ export default function App() {
 
   return (
     <div className="app-container" style={globalContainerStyle}>
+      <AudioManager /> {/* NEW: Placed at the root level so it stays active across all tabs */}
+      
       <RiskAlert />
       <GridAutopilot />
 

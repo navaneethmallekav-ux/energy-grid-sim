@@ -1,11 +1,9 @@
+// src/components/MasterVisualizer.jsx
+
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import useStore from '../engine/gameState'; 
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text, Grid } from '@react-three/drei';
-
-// ==========================================
-// 1. NEON TELEMETRY UI COMPONENTS
-// ==========================================
 
 const LiveSparkline = ({ color, isDead }) => {
   const [offset, setOffset] = useState(0);
@@ -90,20 +88,18 @@ const IntegrityGauge = ({ efficiency }) => {
   );
 };
 
-// ==========================================
-// 2. 3D CYBERPUNK HOLOGRAPHIC ENGINE
-// ==========================================
-
 function HologramNode({ tx, position }) {
   const meshRef = useRef();
   const coreRef = useRef();
   const ringRef = useRef();
   const isBlackout = useStore((state) => state.isBlackout);
   const isDead = tx.status === 'FAILED' || isBlackout;
+  const isShedding = tx.isShedding;
 
   let color = '#00f3ff'; 
   let glow = '#0088ff'; 
   if (tx.status === 'DEGRADED') { color = '#ffb700'; glow = '#cc5500'; }
+  if (isShedding) { color = '#a300ff'; glow = '#5c00a3'; }
   if (isDead) { color = '#ff1a1a'; glow = '#550000'; }
 
   useFrame(({ clock }) => {
@@ -119,7 +115,7 @@ function HologramNode({ tx, position }) {
       meshRef.current.rotation.y = t * 0.4;
       if (coreRef.current) coreRef.current.rotation.x = t * 0.8;
       if (coreRef.current) coreRef.current.rotation.z = t * 0.5;
-      if (ringRef.current) ringRef.current.rotation.z = -t * 1.5;
+      if (ringRef.current) ringRef.current.rotation.z = -t * (isShedding ? 0.5 : 1.5);
     }
   });
 
@@ -161,54 +157,46 @@ function Sector3DView({ groupNodes }) {
       <Canvas camera={{ position: [0, 6, 12], fov: 45 }}>
         <ambientLight intensity={0.2} />
         <directionalLight position={[5, 10, 5]} intensity={1.5} color="#ffffff" />
-        
-        {/* Environment preset removed to prevent 400 errors */}
-        
         <Grid infiniteGrid fadeDistance={25} sectionColor={gridColor} cellColor="#222222" sectionThickness={1.5} cellThickness={0.5} />
-        
-        {/* Render 3 nodes per cluster in a grid layout (3x1) */}
-        {/* Render dynamically into a flexible 2D grid instead of a single overlapping line */}
         {groupNodes.map((tx, i) => {
-          const itemsPerRow = 4; // Adjust this to make the grid wider or narrower
+          const itemsPerRow = 4;
           const spacing = 3;
-          
-          // Spread them left-to-right
           const x = (i % itemsPerRow) * spacing - ((itemsPerRow * spacing) / 2) + (spacing / 2);
-          
-          // Spread them front-to-back
           const z = Math.floor(i / itemsPerRow) * spacing - 3; 
           
           return <HologramNode key={tx.id} tx={tx} position={[x, 0, z]} />;
         })}
-        
         <OrbitControls autoRotate={!isBlackout} autoRotateSpeed={0.8} makeDefault />
       </Canvas>
     </div>
   );
 }
 
-// ==========================================
-// 2.5 SINGLE NODE DIGITAL TWIN (FOR SIDEBAR)
-// ==========================================
-
 export const HologramCore = ({ data }) => {
   const meshRef = useRef();
+  const ringRef = useRef();
   
-  const safeData = data || { load: 0, temp: 0, status: 'OFFLINE', cap: 100 };
+  const safeData = data || { load: 0, temp: 0, status: 'OFFLINE', cap: 100, isShedding: false };
   const intensity = useMemo(() => {
     return safeData.load / (safeData.cap || 1); 
   }, [safeData.load, safeData.cap]);
 
   const color = useMemo(() => {
     if (safeData.status === 'FAILED') return '#ff1a1a';
+    if (safeData.isShedding) return '#a300ff';
     if (safeData.temp > 85) return '#ffb700';
     return '#00f3ff';
-  }, [safeData.status, safeData.temp]);
+  }, [safeData.status, safeData.temp, safeData.isShedding]);
 
   useFrame((state, delta) => {
     if (meshRef.current) {
       const rotationSpeed = safeData.status === 'FAILED' ? 0.2 : (0.5 + intensity * 2);
       meshRef.current.rotation.y += delta * rotationSpeed;
+    }
+    if (ringRef.current) {
+      const scaleBase = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.1;
+      ringRef.current.scale.set(scaleBase, scaleBase, scaleBase);
+      ringRef.current.rotation.z += delta * 0.5;
     }
   });
 
@@ -225,8 +213,7 @@ export const HologramCore = ({ data }) => {
           opacity={0.8}
         />
       </mesh>
-      
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
          <torusGeometry args={[2, 0.05, 16, 100]} />
          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
       </mesh>
@@ -242,49 +229,31 @@ export const DigitalTwin = ({ node }) => {
       <Canvas camera={{ position: [0, 2, 5], fov: 45 }}>
         <ambientLight intensity={0.2} />
         <pointLight position={[10, 10, 10]} intensity={1} color="#00f3ff" />
-        
         <HologramCore data={node} />
-        
         <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.5} />
       </Canvas>
     </div>
   );
 };
 
-// ==========================================
-// 3. MASTER VISUALIZER ASSEMBLY
-// ==========================================
-
 export default function MasterVisualizer() {
-  const { transformers, gridGroups, isBlackout, weather, batteryLevel, gridEfficiency } = useStore();
+  // NEW: Destructured audioEnabled and toggleAudio here
+  const { transformers, gridGroups, isBlackout, weather, batteryLevel, gridEfficiency, shedLoad, audioEnabled, toggleAudio } = useStore();
 
-  const getStatusColor = (status, isBlackout, isOverloaded) => {
+  const getStatusColor = (status, isBlackout, isOverloaded, isShedding) => {
     if (isBlackout || status === 'FAILED') return '#ff1a1a'; 
+    if (isShedding) return '#a300ff';
     if (isOverloaded) return '#ff1a1a'; 
     if (status === 'DEGRADED') return '#ffb700'; 
     return '#00f3ff'; 
   };
 
-  // Helper to map default keys back to their cool display names, falling back to the raw key for dynamic cities
-  const getSectorDisplayName = (key) => {
-    const defaultNames = {
-      'set1': 'Sector 1: Generation Core',
-      'set2': 'Sector 2: Heavy Transmission',
-      'set3': 'Sector 3: Industrial District',
-      'set4': 'Sector 4: Commercial Hub',
-      'set5': 'Sector 5: Residential Grid'
-    };
-    return defaultNames[key] || key;
-  };
-
-  // Instead of hardcoded sector names:
   const activeSectors = Object.keys(gridGroups).filter(key => gridGroups[key].length > 0);
 
- const renderSector = (sectorKey) => {
+  const renderSector = (sectorKey) => {
     const nodes = gridGroups[sectorKey] || [];
     if (nodes.length === 0) return null;
 
-    // Force it to use the sector property from the nodes instead of the key
     const sectorName = nodes[0].sector || "UNKNOWN REGION";
     
     return (
@@ -295,7 +264,6 @@ export default function MasterVisualizer() {
           <span className="sector-node-count">{nodes.length} NODES ONLINE</span>
         </div>
         
-        {/* This now renders whatever city you scanned or the default groups! */}
         <Sector3DView groupNodes={nodes} />
 
         <div className="transformer-grid">
@@ -303,15 +271,19 @@ export default function MasterVisualizer() {
             const loadRatio = tx.load / tx.cap;
             const isOverloaded = loadRatio > 0.9;
             const isDead = tx.status === 'FAILED' || isBlackout;
-            const color = getStatusColor(tx.status, isBlackout, isOverloaded);
+            const isShedding = tx.isShedding;
+            const color = getStatusColor(tx.status, isBlackout, isOverloaded, isShedding);
+            const timeToFailMsg = tx.timeToFailure > 0 ? `${tx.timeToFailure.toFixed(1)}s` : 'STABLE';
+            const ttfColor = tx.timeToFailure > 0 && tx.timeToFailure < 30 ? '#ff1a1a' : '#fff';
+
             return (
               <div 
                 key={tx.id} 
-                className={`transformer-card ${isOverloaded && !isBlackout ? 'pulse-danger' : ''} ${isDead ? 'glitch-card' : ''}`}
+                className={`transformer-card ${isOverloaded && !isBlackout && !isShedding ? 'pulse-danger' : ''} ${isDead ? 'glitch-card' : ''} ${isShedding ? 'shedding-card' : ''}`}
                 style={{ 
                   '--theme-color': color,
                   borderColor: isDead ? '#ff1a1a' : color,
-                  background: isDead ? 'rgba(255, 26, 26, 0.08)' : 'rgba(10, 10, 15, 0.7)',
+                  background: isDead ? 'rgba(255, 26, 26, 0.08)' : (isShedding ? 'rgba(163, 0, 255, 0.08)' : 'rgba(10, 10, 15, 0.7)'),
                   boxShadow: isDead ? 'inset 0 0 30px rgba(255,26,26,0.15)' : `inset 0 0 25px ${color}20, 0 8px 32px rgba(0,0,0,0.8)`
                 }}
               >
@@ -321,7 +293,7 @@ export default function MasterVisualizer() {
                     <div className="tx-role">{tx.role}</div>
                   </div>
                   <div className="status-badge" style={{ background: isDead ? 'transparent' : `${color}20`, color: isDead ? '#ff1a1a' : color, border: `1px solid ${color}`, boxShadow: isDead ? 'none' : `0 0 15px ${color}40` }}>
-                    {isBlackout ? 'OFFLINE' : tx.status}
+                    {isBlackout ? 'OFFLINE' : (isShedding ? 'SHEDDING' : tx.status)}
                   </div>
                 </div>
                 
@@ -353,9 +325,32 @@ export default function MasterVisualizer() {
                     <span className="value">{tx.voltage || 'N/A'}</span>
                   </div>
                   <div className="data-col">
-                    <span className="label">EFF</span> 
-                    <span className="value">{(tx.eff * 100).toFixed(0)} <span className="unit">%</span></span>
+                    <span className="label">T.T.F.</span> 
+                    <span className="value" style={{ color: ttfColor }}>{timeToFailMsg}</span>
                   </div>
+                </div>
+
+                <div className="action-row" style={{ marginTop: '15px', display: 'flex', justifyContent: 'center' }}>
+                  <button 
+                    className="load-shed-btn"
+                    onClick={() => shedLoad(tx.id)}
+                    disabled={isShedding || isDead || isBlackout}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      background: isShedding ? 'rgba(163,0,255,0.2)' : 'rgba(0,0,0,0.5)',
+                      border: `1px solid ${isShedding ? '#a300ff' : color}`,
+                      color: isShedding ? '#a300ff' : color,
+                      cursor: (isShedding || isDead) ? 'not-allowed' : 'pointer',
+                      fontFamily: 'inherit',
+                      fontWeight: 'bold',
+                      letterSpacing: '2px',
+                      borderRadius: '4px',
+                      transition: 'all 0.3s'
+                    }}
+                  >
+                    {isShedding ? 'ISOLATED' : 'LOAD SHED'}
+                  </button>
                 </div>
 
                 <LiveSparkline color={color} isDead={isDead} />
@@ -394,6 +389,13 @@ export default function MasterVisualizer() {
             </div>
           </div>
           <div className="hud-stats">
+            {/* NEW: Audio Toggle Button placed cleanly in the HUD */}
+            <button 
+              className="audio-toggle-btn"
+              onClick={toggleAudio}
+            >
+              {audioEnabled ? "🔊 SYS AUDIO: ON" : "🔇 SYS AUDIO: OFF"}
+            </button>
             <IntegrityGauge efficiency={gridEfficiency || 1} />
             <div className="stat-group">
               <span className="stat-pill">ENV <strong>{weather}</strong></span>
@@ -403,7 +405,6 @@ export default function MasterVisualizer() {
         </header>
         
         <div className="network-topology">
-          {/* Renders dynamically based on active sectors */}
           {activeSectors.map(renderSector)}
         </div>
       </div>
@@ -471,6 +472,25 @@ export default function MasterVisualizer() {
           display: flex;
           align-items: center;
           gap: 25px;
+        }
+        /* NEW CSS for Audio Button */
+        .audio-toggle-btn {
+          background: rgba(0, 243, 255, 0.1);
+          border: 1px solid #00f3ff;
+          color: #00f3ff;
+          padding: 8px 16px;
+          font-family: 'Courier New', monospace;
+          font-size: 12px;
+          letter-spacing: 2px;
+          font-weight: bold;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+        .audio-toggle-btn:hover {
+          background: rgba(0, 243, 255, 0.3);
+          box-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
         }
         .integrity-gauge {
           position: relative;
@@ -672,6 +692,17 @@ export default function MasterVisualizer() {
           0% { transform: translate(0, 0); skewX(0deg); }
           50% { transform: translate(-1px, 1px); skewX(-0.5deg); }
           100% { transform: translate(1px, -1px); skewX(0.5deg); }
+        }
+        .shedding-card {
+          animation: cardShedding 2s infinite alternate;
+        }
+        @keyframes cardShedding {
+          0% { box-shadow: inset 0 0 10px rgba(163,0,255,0.1); }
+          100% { box-shadow: inset 0 0 30px rgba(163,0,255,0.4); }
+        }
+        .load-shed-btn:hover:not(:disabled) {
+          background: rgba(0,243,255,0.2) !important;
+          box-shadow: 0 0 15px currentColor;
         }
       `}</style>
     </div>
